@@ -1,0 +1,14 @@
+name: absa project
+desc: Train and evaluate
+cmd: python3 main.py "alexcadillon/SemEval2014Task4" "laptops" "google/flan-t5-base" "absaL-flanBv2" --input ${DATA} 
+env:
+  python:
+   type: manual
+   version: 3.11
+   requirements-file: requirements.txt
+   local-paths:
+      - utils.py
+      - main.py
+inputs:
+  - prompts_absa.json: DATA
+cloud-instance-type: g2.1

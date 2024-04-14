@@ -1,0 +1,14 @@
+name: absa project multi task joint
+desc: Train and evaluate
+cmd: python3 main_fmt_joint.py  "google/flan-t5-base" "MTabsaJOINT-flanB" --input ${DATA} 
+env:
+  python:
+   type: manual
+   version: 3.11
+   requirements-file: requirements.txt
+   local-paths:
+      - utils.py
+      - main_fmt_joint.py
+inputs:
+  - prompts_joint.json: DATA
+cloud-instance-type: g2.1

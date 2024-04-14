@@ -1,0 +1,14 @@
+name: absa project
+desc: Train and evaluate
+cmd: python3 main_joint.py  "google/flan-t5-base" "absaJOINT-flanB" --input ${DATA} 
+env:
+  python:
+   type: manual
+   version: 3.11
+   requirements-file: requirements.txt
+   local-paths:
+      - utils.py
+      - main_joint.py
+inputs:
+  - prompts_absa.json: DATA
+cloud-instance-type: g2.1

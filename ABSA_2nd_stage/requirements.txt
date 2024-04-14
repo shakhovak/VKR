@@ -1,0 +1,9 @@
+transformers==4.38.2
+accelerate==0.28.0
+datasets==2.18.0
+wandb==0.16.4
+torch==2.2.1
+s3fs==2024.2.0
+peft==0.2.0
+bitsandbytes
+loralib

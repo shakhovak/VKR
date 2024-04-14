@@ -1,0 +1,14 @@
+name: absa project multi task
+desc: Train and evaluate
+cmd: python3 main_fmt.py "alexcadillon/SemEval2014Task4" "laptops" "google/flan-t5-base" "MTabsaL-flanBv2" --input ${DATA} 
+env:
+  python:
+   type: manual
+   version: 3.11
+   requirements-file: requirements.txt
+   local-paths:
+      - utils.py
+      - main_fmt.py
+inputs:
+  - prompts_joint.json: DATA
+cloud-instance-type: g2.1
