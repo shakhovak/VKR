@@ -1,0 +1,14 @@
+name: absa project
+desc: Train and evaluate
+cmd: python3 main_fmt_llama.py "alexcadillon/SemEval2014Task4" "laptops" "huggyllama/llama-7b" "baffo32/decapoda-research-llama-7B-hf" "MTabsaL-llama7" --input ${DATA} 
+env:
+  python:
+   type: manual
+   version: 3.11
+   requirements-file: requirements.txt
+   local-paths:
+      - utils.py
+      - main_fmt_llama.py
+inputs:
+  - prompts_joint.json: DATA
+cloud-instance-type: g2.1
