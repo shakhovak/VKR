@@ -420,7 +420,7 @@ def evaluate_llama(test_dataset, prompter, tokenizer, device, model, exp_name):
             answer = re.sub("[^a-zA-Z:, ]+", "", answer).strip()
 
         prediction = answer.lower()
-        prediction = prediction.replace('aspect name:', "")
+        prediction = prediction.replace("aspect name:", "").replace("</s>", "").strip()
         prediction = (
             prediction.replace("aspects and their polarity:", "")
             .replace(".", "")
@@ -525,7 +525,7 @@ def preprocess_mistral(sample, prompts_file_path):
 
     sample["instruction"] = f"""<s>[INST] {instruction} {sample['text']} [/INST]"""
 
-    sample["answer"] = ", ".join(
+    sample["answer"] = ",".join(
         [f"{item['term']}:{item['polarity']}" for item in sample["aspectTerms"]]
     )
     sample["output"] = (
@@ -544,30 +544,36 @@ def preprocess_mistral_fmt(sample, prompts_file_path, dataset_task):
     num = random.randint(1, len(template) - 1)
     if dataset_task == "ATE":
         instruction = f"Task name: Aspect Term Extraction. {template[dataset_task][str(num)]}"
-        sample["instruction"] = f"""[INST] {instruction}. Text: {sample['text']} [/INST]"""
-        sample["answer"] = ", ".join(
+        sample["instruction"] = (
+            f"""<s>[INST] {instruction}. Text: {sample['text']} [/INST]"""
+        )
+        sample["answer"] = ",".join(
             [item["term"] for item in sample["aspectTerms"]]
         )
-        sample["output"] = (
-            f"{sample['instruction']} Aspects: {sample['answer']}"
-        )
+        sample["output"] = f"{sample['instruction']} Aspects: {sample['answer']} </s>"
     elif dataset_task == "ASC":
         instruction = f"Task name: Sentiment Polarity Classification. {template[dataset_task][str(num)]}"
 
-        sample["aspect_list"] = ", ".join([item["term"] for item in sample["aspectTerms"]])
+        sample["aspect_list"] = ",".join([item["term"] for item in sample["aspectTerms"]])
         sample["answer"] = ",".join(
             [item["polarity"] for item in sample["aspectTerms"]]
         )
-        sample["instruction"] = f"[INST] {instruction}. Sentence: {sample['text']} Aspects mentioned: {sample['aspect_list']}. [/INST]"
-        sample["output"] = f"{sample['instruction']} Polarities of the aspects mentioned: {sample['answer']}"                    
+        sample["instruction"] = (
+            f"<s>[INST] {instruction}. Sentence: {sample['text']} Aspects mentioned: {sample['aspect_list']}. [/INST]"
+        )
+        sample["output"] = (
+            f"{sample['instruction']} Polarities of the aspects mentioned: {sample['answer']} </s>"
+        )
     else:
         instruction = f"Task name: Aspect Term Extraction and Polarity Classification. {template[dataset_task][str(num)]}"
-        sample["instruction"] = f"""[INST] {instruction}. Text: {sample['text']} [/INST]"""
-        sample["answer"] = ", ".join(
+        sample["instruction"] = (
+            f"""<s>[INST] {instruction}. Text: {sample['text']} [/INST]"""
+        )
+        sample["answer"] = ",".join(
             [f"{item['term']}:{item['polarity']}" for item in sample["aspectTerms"]]
         )
         sample["output"] = (
-            f"{sample['instruction']} Aspects and their polarity: {sample['answer']}"
+            f"{sample['instruction']} Aspects and their polarity: {sample['answer']} </s>"
         )
     sample["input"] = sample["text"]
 
