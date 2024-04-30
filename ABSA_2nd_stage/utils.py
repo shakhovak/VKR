@@ -12,7 +12,7 @@ import re
 def generate_response(
     task, model, tokenizer, question, top_p, temperature, prompts_path, device
 ):
-    """ " function to generate response from FLAN models"""
+    """function to generate response from FLAN models"""
     with open(prompts_path) as fp:
         template = json.load(fp)
     num = random.randint(0, len(template) - 1)
@@ -50,7 +50,7 @@ def evaluate_flan(
     top_p=0.5,
     temperature=0.5,
 ):
-    """function to evaluate generation results"""
+    """function to evaluate FLAN generation results"""
 
     TP_aspect = 0
     FN_aspect = 0
@@ -137,6 +137,7 @@ def evaluate_flan(
 
 
 def preprocess_SemEval14(sample, prompts_file_path):
+    """function to preprocess data for FLAN"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -157,7 +158,7 @@ def preprocess_SemEval14(sample, prompts_file_path):
 def preprocess_function(
     sample, tokenizer, max_source_length, max_target_length, padding="max_length"
 ):
-
+    """function to tokenize data for FLAN"""
     model_inputs = tokenizer(
         sample["aspect_polarities_input"],
         max_length=max_source_length,
@@ -186,6 +187,7 @@ def preprocess_function(
 
 # ===============================================================================
 def createASC_dataset(sample, prompts_file_path):
+    """function to create ASC dataset for FLAN"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -210,6 +212,7 @@ def createASC_dataset(sample, prompts_file_path):
 
 
 def createATE_dataset(sample, prompts_file_path):
+    """function to create ATE dataset for FLAN"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -232,6 +235,7 @@ def createATE_dataset(sample, prompts_file_path):
 
 # ===============================================================================
 def createABSA_dataset(sample, prompts_file_path):
+    """function to create ABSA dataset for FLAN"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -256,6 +260,7 @@ def createABSA_dataset(sample, prompts_file_path):
 
 
 def preprocess_llama(sample, prompts_file_path):
+    """function to preprocess data for single-task for Llama 2 7B"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -279,6 +284,7 @@ def preprocess_llama(sample, prompts_file_path):
 
 
 def tokenize(prompt, tokenizer, cutoff_len=256, add_eos_token=True):
+    """function to tokenize data for Llama 2 7B and Mistral"""
     result = tokenizer(
         prompt,
         truncation=True,
@@ -301,15 +307,14 @@ def tokenize(prompt, tokenizer, cutoff_len=256, add_eos_token=True):
 
 # ===============================================================================
 def generate_and_tokenize_prompt(data_point, prompter, tokenizer):
+    """function to create instruction for Llama and Mistral"""
     full_prompt = prompter.generate_prompt(
         data_point["instruction"],
         data_point["output"],
     )
     tokenized_full_prompt = tokenize(full_prompt, tokenizer)
     user_prompt = prompter.generate_prompt(data_point["instruction"])
-    tokenized_user_prompt = tokenize(user_prompt,
-                                     tokenizer,
-                                     add_eos_token=False)
+    tokenized_user_prompt = tokenize(user_prompt, tokenizer, add_eos_token=False)
     user_prompt_len = len(tokenized_user_prompt["input_ids"])
 
     tokenized_full_prompt["labels"] = [-100] * user_prompt_len + tokenized_full_prompt[
@@ -323,6 +328,7 @@ def generate_and_tokenize_prompt(data_point, prompter, tokenizer):
 # ===============================================================================
 
 
+# Promter object to make it easier instruction creattion for LLama and Mistral
 class Prompter(object):
 
     def generate_prompt(
@@ -358,6 +364,7 @@ def generate_llama(
     max_new_tokens=256,
     **kwargs,
 ):
+    """function to generate output for Llama and Mistral in inference"""
     prompt = prompter.generate_prompt(text)
     inputs = tokenizer(prompt, return_tensors="pt")
     input_ids = inputs["input_ids"].to(device)
@@ -384,6 +391,7 @@ def generate_llama(
 
 # ===============================================================================
 def evaluate_llama(test_dataset, prompter, tokenizer, device, model, exp_name):
+    """function to evaluate Llama and Mistral in inference"""
     TP_aspect = 0
     FN_aspect = 0
     FP_aspect = 0
@@ -476,31 +484,37 @@ def evaluate_llama(test_dataset, prompter, tokenizer, device, model, exp_name):
     wandb.finish()
     logging.info("All logging is done.")
 
+
 # ===============================================================================
 
 
 def preprocess_llama_fmt(sample, prompts_file_path, dataset_task):
+    """function to create multi-task dataset for Llama and Mistral"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
     num = random.randint(1, len(template) - 1)
     if dataset_task == "ATE":
-        instruction = f"Task name: Aspect Term Extraction. {template[dataset_task][str(num)]}"
+        instruction = (
+            f"Task name: Aspect Term Extraction. {template[dataset_task][str(num)]}"
+        )
         sample["instruction"] = f"""{instruction}. Text: {sample['text']}"""
-        sample["answer"] = ", ".join(
-            [item["term"] for item in sample["aspectTerms"]]
-        )
-        sample["output"] = (
-            f"{sample['instruction']} Aspects: {sample['answer']}"
-        )
+        sample["answer"] = ", ".join([item["term"] for item in sample["aspectTerms"]])
+        sample["output"] = f"{sample['instruction']} Aspects: {sample['answer']}"
     elif dataset_task == "ACS":
         instruction = f"Task name: Sentiment Polarity Classification. {template[dataset_task][str(num)]}"
-        sample["aspect_list"] = ", ".join([item["term"] for item in sample["aspectTerms"]])
+        sample["aspect_list"] = ", ".join(
+            [item["term"] for item in sample["aspectTerms"]]
+        )
         sample["answer"] = ",".join(
             [item["polarity"] for item in sample["aspectTerms"]]
         )
-        sample["instruction"] = f"{instruction}. Sentence: {sample['text']} Aspects mentioned: {sample['aspect_list']}."
-        sample["output"] = f"{sample['instruction']} Polarities of the aspects mentioned: {sample['answer']}."
+        sample["instruction"] = (
+            f"{instruction}. Sentence: {sample['text']} Aspects mentioned: {sample['aspect_list']}."
+        )
+        sample["output"] = (
+            f"{sample['instruction']} Polarities of the aspects mentioned: {sample['answer']}."
+        )
     else:
         instruction = f"Task name: Aspect Term Extraction and Polarity Classification. {template[dataset_task][str(num)]}"
         sample["instruction"] = f"""{instruction} {sample['text']} """
@@ -513,10 +527,13 @@ def preprocess_llama_fmt(sample, prompts_file_path, dataset_task):
     sample["input"] = sample["text"]
 
     return sample
+
+
 # ===============================================================================
 
 
 def preprocess_mistral(sample, prompts_file_path):
+    """function to preprocess data for single-task Mistral"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
@@ -534,27 +551,32 @@ def preprocess_mistral(sample, prompts_file_path):
     sample["input"] = sample["text"]
 
     return sample
+
+
 # ===============================================================================
 
 
 def preprocess_mistral_fmt(sample, prompts_file_path, dataset_task):
+    """function to preprocess data for multi-task Mistral"""
     with open(prompts_file_path) as fp:
         template = json.load(fp)
 
     num = random.randint(1, len(template) - 1)
     if dataset_task == "ATE":
-        instruction = f"Task name: Aspect Term Extraction. {template[dataset_task][str(num)]}"
+        instruction = (
+            f"Task name: Aspect Term Extraction. {template[dataset_task][str(num)]}"
+        )
         sample["instruction"] = (
             f"""<s>[INST] {instruction}. Text: {sample['text']} [/INST]"""
         )
-        sample["answer"] = ",".join(
-            [item["term"] for item in sample["aspectTerms"]]
-        )
+        sample["answer"] = ",".join([item["term"] for item in sample["aspectTerms"]])
         sample["output"] = f"{sample['instruction']} Aspects: {sample['answer']} </s>"
     elif dataset_task == "ASC":
         instruction = f"Task name: Sentiment Polarity Classification. {template[dataset_task][str(num)]}"
 
-        sample["aspect_list"] = ",".join([item["term"] for item in sample["aspectTerms"]])
+        sample["aspect_list"] = ",".join(
+            [item["term"] for item in sample["aspectTerms"]]
+        )
         sample["answer"] = ",".join(
             [item["polarity"] for item in sample["aspectTerms"]]
         )

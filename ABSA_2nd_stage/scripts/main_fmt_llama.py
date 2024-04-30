@@ -111,17 +111,7 @@ if __name__ == "__main__":
             },
         )
     )
-    val_data = (
-        instruction_dataset["val"]
-        .shuffle()
-        .map(
-            generate_and_tokenize_prompt,
-            fn_kwargs={
-                "prompter": prompter,
-                "tokenizer": tokenizer,
-            },
-        )
-    )
+    val_data = instruction_dataset["val"].shuffle()
 
     logger.info("Loading model...")
     os.environ["TOKENIZERS_PARALLELISM"] = "false"

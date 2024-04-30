@@ -14,10 +14,10 @@ from datasets import concatenate_datasets
 from huggingface_hub import HfFolder
 import torch
 from utils import (
-    preprocess_llama,
     generate_and_tokenize_prompt,
     Prompter,
     evaluate_llama,
+    preprocess_mistral_fmt,
 )
 import wandb
 from peft import (
@@ -43,6 +43,19 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
     logger = logging.getLogger()
 
+    logger.info("Loading model...")
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # load model from the hub
+    model_base = AutoModelForCausalLM.from_pretrained(
+        args.model_id_model,
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        token=os.environ["hf_readtoken"],
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_id_tokenizer, token=os.environ["hf_readtoken"]
+    )
+    tokenizer.pad_token_id = 0
     # read files
     logger.info("Reading and augementing datasets...")
     raw_datasets = load_dataset(args.dataset_name, args.dataset_split)
@@ -53,21 +66,37 @@ if __name__ == "__main__":
     if args.dataset_split == "restaurants":
         raw_datasets = raw_datasets.remove_columns(["aspectCategories"])
 
-    dataset_train_test = raw_datasets.train_test_split(test_size=0.1)
-    dataset_test_valid = dataset_train_test["test"].train_test_split(test_size=0.5)
-    final_ds = DatasetDict(
+    # separete test dataset (not to be used in other sets creation!!!!)
+    train_test_split = raw_datasets.train_test_split(test_size=0.04)
+    ATE_dataset = train_test_split["train"].map(
+        preprocess_mistral_fmt,
+        fn_kwargs={"prompts_file_path": args.input, "dataset_task": "ATE"},
+    )
+    ASC_dataset = train_test_split["train"].map(
+        preprocess_mistral_fmt,
+        fn_kwargs={"prompts_file_path": args.input, "dataset_task": "ASC"},
+    )
+    ABSA_dataset = train_test_split["train"].map(
+        preprocess_mistral_fmt,
+        fn_kwargs={"prompts_file_path": args.input, "dataset_task": "ABSA"},
+    )
+    ABSA_test = train_test_split["test"].map(
+        preprocess_mistral_fmt,
+        fn_kwargs={"prompts_file_path": args.input, "dataset_task": "ABSA"},
+    )
+    combined_datasets = concatenate_datasets(
+        [ATE_dataset, ASC_dataset, ABSA_dataset],
+    )
+    combined_datasets = combined_datasets.shuffle()
+    dataset_train_test = combined_datasets.train_test_split(test_size=0.1)
+
+    instruction_dataset = DatasetDict(
         {
             "train": dataset_train_test["train"],
-            "test": dataset_test_valid["train"],
-            "val": dataset_test_valid["test"],
+            "test": dataset_train_test["test"],
+            "val": ABSA_test,
         }
     )
-    instruction_dataset = final_ds.map(
-        preprocess_llama, fn_kwargs={"prompts_file_path": args.input}
-    )
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id_tokenizer)
-    tokenizer.pad_token_id = 0
 
     prompter = Prompter()
 
@@ -95,12 +124,6 @@ if __name__ == "__main__":
     )
     val_data = instruction_dataset["val"].shuffle()
 
-    logger.info("Loading model...")
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    # load model from the hub
-    model_base = AutoModelForCausalLM.from_pretrained(
-        args.model_id_model, load_in_8bit=True, torch_dtype=torch.float16
-    )
     # Define LoRA Config
     lora_config = LoraConfig(
         r=64,
@@ -128,7 +151,9 @@ if __name__ == "__main__":
     wandb.login(key=os.environ["wandb_login"])
 
     # Hugging Face repository id
-    repository_id = f"{args.model_id_tokenizer.split('/')[1]}-absa-{args.dataset_split}"
+    repository_id = (
+        f"{args.model_id_tokenizer.split('/')[1]}-absa-MT-{args.dataset_split}"
+    )
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
@@ -141,8 +166,8 @@ if __name__ == "__main__":
         gradient_accumulation_steps=4,
         warmup_steps=2,
         num_train_epochs=1,
-        max_steps=400,
-        learning_rate=3e-4,
+        max_steps=1200,
+        learning_rate=3e-5,
         fp16=True,
         optim="adamw_torch",
         # logging & evaluation strategies

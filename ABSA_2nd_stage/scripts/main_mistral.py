@@ -14,7 +14,7 @@ from datasets import concatenate_datasets
 from huggingface_hub import HfFolder
 import torch
 from utils import (
-    preprocess_llama,
+    preprocess_mistral,
     generate_and_tokenize_prompt,
     Prompter,
     evaluate_llama,
@@ -43,6 +43,20 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
     logger = logging.getLogger()
 
+    logger.info("Loading model...")
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # load model from the hub
+    model_base = AutoModelForCausalLM.from_pretrained(
+        args.model_id_model,
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        token=os.environ["hf_readtoken"],
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_id_tokenizer, token=os.environ["hf_readtoken"]
+    )
+    tokenizer.pad_token_id = 0
+
     # read files
     logger.info("Reading and augementing datasets...")
     raw_datasets = load_dataset(args.dataset_name, args.dataset_split)
@@ -54,7 +68,7 @@ if __name__ == "__main__":
         raw_datasets = raw_datasets.remove_columns(["aspectCategories"])
 
     dataset_train_test = raw_datasets.train_test_split(test_size=0.1)
-    dataset_test_valid = dataset_train_test["test"].train_test_split(test_size=0.5)
+    dataset_test_valid = dataset_train_test["test"].train_test_split(test_size=0.4)
     final_ds = DatasetDict(
         {
             "train": dataset_train_test["train"],
@@ -63,11 +77,8 @@ if __name__ == "__main__":
         }
     )
     instruction_dataset = final_ds.map(
-        preprocess_llama, fn_kwargs={"prompts_file_path": args.input}
+        preprocess_mistral, fn_kwargs={"prompts_file_path": args.input}
     )
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id_tokenizer)
-    tokenizer.pad_token_id = 0
 
     prompter = Prompter()
 
@@ -95,12 +106,6 @@ if __name__ == "__main__":
     )
     val_data = instruction_dataset["val"].shuffle()
 
-    logger.info("Loading model...")
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    # load model from the hub
-    model_base = AutoModelForCausalLM.from_pretrained(
-        args.model_id_model, load_in_8bit=True, torch_dtype=torch.float16
-    )
     # Define LoRA Config
     lora_config = LoraConfig(
         r=64,
@@ -142,7 +147,7 @@ if __name__ == "__main__":
         warmup_steps=2,
         num_train_epochs=1,
         max_steps=400,
-        learning_rate=3e-4,
+        learning_rate=3e-5,
         fp16=True,
         optim="adamw_torch",
         # logging & evaluation strategies
@@ -166,6 +171,7 @@ if __name__ == "__main__":
         eval_dataset=test_data,
     )
     model.config.use_cache = False
+
     logger.info("Starting training...")
     trainer.train()
 

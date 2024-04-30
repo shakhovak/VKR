@@ -129,7 +129,7 @@ if __name__ == "__main__":
     HfFolder.save_token(os.environ["hugging_face_login"])
 
     os.environ["WANDB_PROJECT"] = "absa_fin"
-    os.environ["WANDB_LOG_MODEL"] = "end"
+    os.environ["WANDB_LOG_MODEL"] = "false"
     wandb.login(key=os.environ["wandb_login"])
 
     # Hugging Face repository id
